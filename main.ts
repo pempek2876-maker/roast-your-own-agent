@@ -43,6 +43,7 @@ type Features = {
   specificHits: number;
   hasDigit: number;
   punchEnd: number;
+  punchImage: number;
   escalation: number;
   reversal: number;
   fillerHits: number;
@@ -60,13 +61,17 @@ function features(text: string): Features {
   const segs = text.split(/[,;:]/).map((s) => s.trim()).filter(Boolean);
   const lastLen = segs.length ? segs[segs.length - 1].length : chars;
   const punchEnd = lastLen <= 60 ? 1 : 0;
+  // The punch lands harder when the final clause ends on a concrete image
+  // (a thing the reader can see) rather than an abstraction.
+  const lastSeg = segs.length ? segs[segs.length - 1].toLowerCase() : low;
+  const punchImage = SPECIFIC.some((s) => lastSeg.includes(s)) ? 1 : 0;
   // Three-beat escalation: at least two commas and a closing "and".
   const escalation = (text.match(/,/g) || []).length >= 2 && / and /.test(low) ? 1 : 0;
   // A turn word that flips the setup into the joke.
   const reversal = /( less | more | but | so | which | even | still )/.test(low) ? 1 : 0;
   const fillerHits = FILLER.filter((s) => low.includes(s)).length;
   const tight = chars >= 70 && chars <= 140 ? 1 : chars <= 165 ? 0.5 : 0;
-  return { chars, stockHits, specificHits, hasDigit, punchEnd, escalation, reversal, fillerHits, tight };
+  return { chars, stockHits, specificHits, hasDigit, punchEnd, punchImage, escalation, reversal, fillerHits, tight };
 }
 
 // Weights follow the judge's published order: punch (funny) first, then
@@ -75,6 +80,7 @@ function score(text: string): number {
   const f = features(text);
   return (
     3 * f.punchEnd +
+    1.5 * f.punchImage +
     2 * f.escalation +
     2 * f.reversal +
     2.5 * f.specificHits +
